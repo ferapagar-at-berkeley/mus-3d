@@ -1,0 +1,184 @@
+<!doctype html>
+<html lang="es">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+  <title>Mus 3D · Bar El Órdago</title>
+  <meta name="description" content="Mus en 3D en el navegador contra bots con las caras de tus amigos. Mueve la cabeza, pilla las señas y echa un órdago.">
+  <meta name="theme-color" content="#1a120c">
+  <link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='.9em' font-size='90'>🃏</text></svg>">
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Alfa+Slab+One&family=Nunito:wght@400;600;800&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="css/style.css">
+  <script type="importmap">
+    {
+      "imports": {
+        "three": "https://cdn.jsdelivr.net/npm/three@0.160.0/build/three.module.js",
+        "three/addons/": "https://cdn.jsdelivr.net/npm/three@0.160.0/examples/jsm/"
+      }
+    }
+  </script>
+</head>
+<body>
+  <div id="app">
+    <div id="stage"></div>
+    <div id="overlay"></div>
+
+    <header id="hud">
+      <div id="scoreboard" class="panel">
+        <div class="row us"><span class="names" id="names-us">Nosotros</span><b id="score-us">0</b></div>
+        <div class="row them"><span class="names" id="names-them">Ellos</span><b id="score-them">0</b></div>
+        <div class="target">a <span id="target">40</span> tantos</div>
+      </div>
+      <div id="lances" class="panel">
+        <div class="phase" id="phase">Mus</div>
+        <div class="chips">
+          <div class="chip" data-lance="grande"><b>Grande</b><span></span></div>
+          <div class="chip" data-lance="chica"><b>Chica</b><span></span></div>
+          <div class="chip" data-lance="pares"><b>Pares</b><span></span></div>
+          <div class="chip" data-lance="juego"><b>Juego</b><span></span></div>
+        </div>
+      </div>
+      <div id="tools">
+        <button class="tool" id="btn-senas" title="Hacer una seña a tu compañero">🤫<span>Señas</span></button>
+        <button class="tool" id="btn-log" title="Historial de la mano">📜<span>Historial</span></button>
+        <button class="tool" id="btn-gyro" title="Mover la cabeza moviendo el móvil" hidden>🧭<span>Giroscopio</span></button>
+        <button class="tool" id="btn-center" title="Mirar al frente (C o doble clic)">🎯<span>Centrar</span></button>
+        <button class="tool" id="btn-sound" title="Sonido y voz">🔊<span>Sonido</span></button>
+        <button class="tool" id="btn-players" title="Jugadores, caras y opciones">👥<span>Jugadores</span></button>
+        <button class="tool" id="btn-rules" title="Cómo se juega">❓<span>Reglas</span></button>
+      </div>
+    </header>
+
+    <div id="senas-pop" class="panel pop" hidden>
+      <div class="pop-title">Seña a <b id="senas-partner">tu compañero</b></div>
+      <div class="pop-sub">Los rivales a veces la pillan…</div>
+      <div id="senas-list"></div>
+    </div>
+
+    <aside id="log" class="panel" hidden>
+      <div class="pop-title">Historial</div>
+      <ol id="log-list"></ol>
+    </aside>
+
+    <div id="look-hint">Arrastra para mover la cabeza · ←→ o A/D · doble clic para centrar</div>
+    <div id="toasts"></div>
+
+    <section id="conteo" class="panel" hidden>
+      <div class="pop-title">Conteo</div>
+      <div id="conteo-lines"></div>
+      <div id="conteo-hands"></div>
+    </section>
+
+    <footer id="actions" class="panel">
+      <div id="handinfo"></div>
+      <div id="prompt">Pulsa <b>¡A jugar!</b> para empezar.</div>
+      <div id="buttons"></div>
+    </footer>
+  </div>
+
+  <!-- Jugadores, caras y opciones -->
+  <div class="modal" id="modal-setup" hidden>
+    <div class="modal-card wide">
+      <h1 class="logo">Mus 3D <small>Bar El Órdago</small></h1>
+      <p class="lead">Ponle cara a cada uno: sube una foto o hazla con la cámara. Las fotos se quedan solo en este navegador.</p>
+      <div id="seats"></div>
+      <div class="options">
+        <label>Partida a
+          <select id="opt-target">
+            <option value="30">30 tantos</option>
+            <option value="40">40 tantos</option>
+          </select>
+        </label>
+        <label>Baraja
+          <select id="opt-reyes">
+            <option value="8">8 reyes (treses = reyes)</option>
+            <option value="4">4 reyes</option>
+          </select>
+        </label>
+        <label>Ritmo
+          <select id="opt-speed">
+            <option value="0.55">Rápido</option>
+            <option value="1">Normal</option>
+            <option value="1.6">Tranquilo</option>
+          </select>
+        </label>
+        <label class="check"><input type="checkbox" id="opt-voice"> Voz de los bots</label>
+        <label class="check"><input type="checkbox" id="opt-hints"> Ayudas (tu mano y probabilidad)</label>
+      </div>
+      <div class="modal-actions">
+        <button class="btn ghost" id="setup-close" hidden>Volver a la partida</button>
+        <button class="btn primary big" id="setup-play">¡A jugar!</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- Recorte de foto -->
+  <div class="modal" id="modal-crop" hidden>
+    <div class="modal-card">
+      <h2>Encuadra la cara</h2>
+      <p class="lead">Arrastra para mover y usa la rueda o el control para hacer zoom. Que la cara llene el óvalo.</p>
+      <div class="crop-wrap"><canvas id="crop-canvas" width="320" height="320"></canvas><div class="crop-guide"></div></div>
+      <input type="range" id="crop-zoom" min="1" max="4" step="0.01" value="1.4">
+      <div class="modal-actions">
+        <button class="btn ghost" id="crop-cancel">Cancelar</button>
+        <button class="btn primary" id="crop-ok">Usar esta cara</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- Cámara -->
+  <div class="modal" id="modal-cam" hidden>
+    <div class="modal-card">
+      <h2>¡Sonríe!</h2>
+      <div class="cam-wrap"><video id="cam-video" autoplay playsinline muted></video><div class="crop-guide"></div></div>
+      <div class="modal-actions">
+        <button class="btn ghost" id="cam-cancel">Cancelar</button>
+        <button class="btn primary" id="cam-shot">📸 Hacer foto</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- Fin de partida -->
+  <div class="modal" id="modal-end" hidden>
+    <div class="modal-card">
+      <h1 class="logo" id="end-title">¡Habéis ganado!</h1>
+      <p class="lead" id="end-text"></p>
+      <div class="modal-actions">
+        <button class="btn ghost" id="end-players">Cambiar jugadores</button>
+        <button class="btn primary big" id="end-again">Revancha</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- Reglas -->
+  <div class="modal" id="modal-rules" hidden>
+    <div class="modal-card wide rules">
+      <h2>Cómo se juega al mus</h2>
+      <p>Dos parejas: tú y quien tienes <b>enfrente</b> contra los de los lados. Se juega hacia la derecha y empieza hablando <b>la mano</b> (la que tiene la etiqueta «mano»). Gana la primera pareja que llega a los tantos de la partida.</p>
+      <h3>1. Mus</h3>
+      <p>Cada uno dice <b>Mus</b> (quiere cambiar cartas) o <b>No hay mus</b> (se juega con estas). Si todos dan mus, cada uno descarta de 1 a 4 cartas y recibe otras.</p>
+      <h3>2. Los cuatro lances</h3>
+      <ul>
+        <li><b>Grande</b>: gana la mano más alta. Orden: Rey &gt; Caballo &gt; Sota &gt; 7 &gt; 6 &gt; 5 &gt; 4 &gt; As. Con 8 reyes, los <b>treses</b> son reyes y los <b>doses</b> son ases.</li>
+        <li><b>Chica</b>: gana la más baja (los ases son lo mejor).</li>
+        <li><b>Pares</b>: par (1 tanto), medias = trío (2) y duples = dos parejas (3). Primero se dice si se tiene o no.</li>
+        <li><b>Juego</b>: figuras valen 10 y el resto su número. Hay juego con 31 o más. Orden: <b>31</b> &gt; 32 &gt; 40 &gt; 37 &gt; 36 &gt; 35 &gt; 34 &gt; 33. El 31 vale 3 y el resto 2. Si nadie tiene juego se juega al <b>punto</b> (gana quien más sume, vale 1).</li>
+      </ul>
+      <h3>3. Apuestas</h3>
+      <p>En cada lance puedes <b>pasar</b>, <b>envidar</b> (2 o más tantos) o echar un <b>órdago</b> (te juegas la partida entera). El rival puede <b>querer</b>, <b>no querer</b> (el que envidó cobra 1, o lo que ya estuviese querido) o <b>subir</b>. Lo querido se cobra al final de la mano en el <b>conteo</b>. Grande y chica en paso valen 1. Los empates los gana quien esté más cerca de la mano.</p>
+      <h3>4. Señas</h3>
+      <p>Tu compañero te hará señas con la cara. Los rivales también se las hacen entre ellos… <b>si estás mirando, las pillas</b>. Gira la cabeza (arrastrando, con las flechas o con el giroscopio del móvil).</p>
+      <div id="senas-table"></div>
+      <h3>Controles</h3>
+      <p>Arrastra para mover la cabeza · ←→↑↓ o WASD · <b>C</b> o doble clic para centrar · toca las cartas (o 1-4) para elegir descartes.</p>
+      <div class="modal-actions"><button class="btn primary" id="rules-close">¡Entendido!</button></div>
+    </div>
+  </div>
+
+  <input type="file" id="file-input" accept="image/*" hidden>
+  <noscript>Necesitas JavaScript para jugar al mus.</noscript>
+  <script type="module" src="js/main.js"></script>
+</body>
+</html>
